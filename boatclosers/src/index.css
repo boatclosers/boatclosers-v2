@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0c2d48;
+  --navy-light: #14456b;
+  --teal: #1a8a7d;
+  --teal-light: #22b8a8;
+  --sand: #f5f0e8;
+  --sand-dark: #e8dfd2;
+  --coral: #e8624a;
+  --white: #ffffff;
+  --gray-100: #f7f8fa;
+  --gray-200: #e9ecef;
+  --gray-300: #ced4da;
+  --gray-500: #6c757d;
+  --gray-700: #3d4852;
+  --gray-900: #1a1a2e;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--gray-900);
+  background: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', serif;
+}
+
+input, select, textarea {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Signature canvas */
+.sig-canvas {
+  border: 2px dashed var(--gray-300);
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.sig-canvas:hover {
+  border-color: var(--teal);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
+
+/* Print styles for documents */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}
