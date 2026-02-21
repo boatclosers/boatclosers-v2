@@ -597,11 +597,11 @@ function StepTerms({ tx, update }) {
   };
 
   const DEPOSIT_METHODS = [
-    { id: 'escrow',  name: 'Escrow.com',       icon: Shield,   desc: 'Secure third-party escrow. Funds held safely until closing.', tag: 'Recommended',     tagStyle: { background: '#d1fae5', color: '#065f46' } },
+    { id: 'escrow',  name: 'Escrow.com',       icon: Shield,   desc: 'Secure third-party escrow. Funds held safely until closing.', tag: 'Recommended',     tagStyle: { background: '#e0f7f4', color: 'var(--navy)' } },
     { id: 'wire',    name: 'Wire Transfer',     icon: Building, desc: 'Direct bank wire to deposit holder. Fast & traceable.',       tag: null,               tagStyle: {} },
     { id: 'zelle',   name: 'Zelle',             icon: Zap,      desc: 'Instant bank-to-bank transfer.',                             tag: null,               tagStyle: {} },
-    { id: 'cash',    name: 'Cash in Person',    icon: Banknote, desc: 'Meet in person at an agreed public location.',                tag: 'In-Person',        tagStyle: { background: '#fef3c7', color: '#92400e' } },
-    { id: 'none',    name: 'No Deposit',        icon: XCircle,  desc: 'Proceed without earnest money deposit.',                     tag: 'Not Recommended',  tagStyle: { background: '#fee2e2', color: '#991b1b' } },
+    { id: 'cash',    name: 'Cash in Person',    icon: Banknote, desc: 'Meet in person at an agreed public location.',                tag: 'In-Person',        tagStyle: { background: 'var(--sand)', color: 'var(--navy)' } },
+    { id: 'none',    name: 'No Deposit',        icon: XCircle,  desc: 'Proceed without earnest money deposit.',                     tag: 'Not Recommended',  tagStyle: { background: '#fde8e6', color: 'var(--navy)' } },
   ];
 
   const PLANS = [
@@ -711,7 +711,7 @@ function StepTerms({ tx, update }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)' }} onClick={() => setShowPaywall(false)}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-8 text-center text-white" style={{ background: 'linear-gradient(135deg, var(--navy) 0%, var(--teal) 100%)' }}>
+        <div className="p-8 text-center text-white" style={{ background: 'linear-gradient(170deg, var(--navy) 0%, var(--navy-light) 60%, var(--teal) 100%)' }}>
           <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.2)' }}>
             <Lock className="w-7 h-7 text-white" />
           </div>
@@ -735,7 +735,7 @@ function StepTerms({ tx, update }) {
                   ? { borderColor: 'var(--teal)', background: '#e0f7f4' }
                   : { borderColor: 'var(--gray-200)', background: 'white' }}>
                 {plan.id === 'premium' && (
-                  <span className="absolute -top-2.5 right-2 px-2 py-0.5 rounded-full text-white text-[10px] font-bold" style={{ background: 'linear-gradient(90deg,#f59e0b,#ef4444)' }}>BEST VALUE</span>
+                  <span className="absolute -top-2.5 right-2 px-2 py-0.5 rounded-full text-white text-[10px] font-bold" style={{ background: 'var(--coral)' }}>BEST VALUE</span>
                 )}
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-bold text-sm" style={{ color: selectedPlan === plan.id ? 'var(--teal)' : 'var(--navy)' }}>{plan.name}</span>
@@ -754,7 +754,7 @@ function StepTerms({ tx, update }) {
           </div>
 
           {/* Terms agree */}
-          <div className="rounded-xl border p-4 text-xs space-y-2" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
+          <div className="rounded-xl border p-4 text-xs space-y-2" style={{ background: 'var(--sand)', borderColor: 'var(--sand-dark)' }}>
             <p className="font-semibold" style={{ color: 'var(--navy)' }}>Platform Agreement</p>
             <p style={{ color: 'var(--gray-700)' }}><strong>Disclaimer:</strong> BoatClosers is a document preparation service, NOT a licensed broker, attorney, or escrow company. We do not provide legal, financial, or maritime advice.</p>
             <p style={{ color: 'var(--gray-700)' }}><strong>Liability:</strong> BoatClosers liability is limited to the transaction fee paid. We are not liable for disputes, vessel condition, or transaction outcomes.</p>
@@ -771,12 +771,12 @@ function StepTerms({ tx, update }) {
             disabled={!agreedToTerms || payProcessing}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white transition-all"
             style={agreedToTerms && !payProcessing
-              ? { background: 'linear-gradient(135deg, var(--navy), var(--teal))' }
+              ? { background: 'linear-gradient(170deg, var(--navy) 0%, var(--navy-light) 60%, var(--teal) 100%)' }
               : { background: 'var(--gray-300)', cursor: 'not-allowed' }}>
             <CreditCard className="w-5 h-5" />
             {payProcessing ? 'Processing…' : `Pay $${activePlan.price} — ${activePlan.name} Plan`}
           </button>
-          {!agreedToTerms && <p className="text-center text-xs" style={{ color: '#b45309' }}>Agree to platform terms above to continue</p>}
+          {!agreedToTerms && <p className="text-center text-xs" style={{ color: 'var(--navy)' }}>Agree to platform terms above to continue</p>}
           <p className="text-center text-xs flex items-center justify-center gap-1" style={{ color: 'var(--gray-500)' }}>
             <Shield className="w-3 h-3" /> Secure payment via Stripe · One-time fee · No hidden charges
           </p>
@@ -797,7 +797,7 @@ function StepTerms({ tx, update }) {
     return (
       <div className="space-y-6">
         <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-          <div className="p-6 text-center text-white" style={{ background: 'linear-gradient(135deg, var(--navy), var(--teal))' }}>
+          <div className="p-6 text-center text-white" style={{ background: 'linear-gradient(170deg, var(--navy) 0%, var(--navy-light) 60%, var(--teal) 100%)' }}>
             <Send className="w-10 h-10 mx-auto mb-3 opacity-90" />
             <h2 className="text-2xl font-bold" style={{ fontFamily: 'Playfair Display, serif' }}>Review Your Offer</h2>
             <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.8)' }}>Confirm everything before generating</p>
@@ -852,14 +852,14 @@ function StepTerms({ tx, update }) {
             )}
             {/* Notes */}
             {offer.notes && (
-              <div className="p-3 rounded-xl" style={{ background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                <p className="text-xs font-medium mb-1" style={{ color: '#92400e' }}>Notes</p>
-                <p className="text-sm" style={{ color: '#78350f' }}>{offer.notes}</p>
+              <div className="p-3 rounded-xl" style={{ background: 'var(--sand)', border: '1px solid #fcd34d' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>Notes</p>
+                <p className="text-sm" style={{ color: 'var(--navy)' }}>{offer.notes}</p>
               </div>
             )}
             {/* Disclaimer */}
             <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'var(--sand)' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#b45309' }} />
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--navy)' }} />
               <p className="text-xs" style={{ color: 'var(--gray-700)' }}>By generating this offer, you acknowledge BoatClosers is a document preparation service and does not act as a broker, agent, or attorney.</p>
             </div>
           </div>
@@ -888,11 +888,11 @@ function StepTerms({ tx, update }) {
 
       {/* ── ACCEPTED OFFER BANNER ────────────────────────────────── */}
       {offer.generated && offer.status === 'accepted' && (
-        <div className="rounded-2xl p-5 border-2" style={{ background: '#f0fdf4', borderColor: '#86efac' }}>
+        <div className="rounded-2xl p-5 border-2" style={{ background: '#e8f4f3', borderColor: 'var(--teal-light)' }}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#bbf7d0' }}><CheckCircle className="w-5 h-5" style={{ color: '#16a34a' }} /></div>
-            <div><h3 className="font-bold" style={{ color: '#15803d' }}>Offer Accepted</h3>
-              <p className="text-sm" style={{ color: '#16a34a' }}>{offer.hasPaid ? 'Platform unlocked — proceed through all steps.' : 'Complete payment to unlock all transaction tools.'}</p></div>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'var(--teal-light)' }}><CheckCircle className="w-5 h-5" style={{ color: 'var(--teal)' }} /></div>
+            <div><h3 className="font-bold" style={{ color: 'var(--navy)' }}>Offer Accepted</h3>
+              <p className="text-sm" style={{ color: 'var(--teal)' }}>{offer.hasPaid ? 'Platform unlocked — proceed through all steps.' : 'Complete payment to unlock all transaction tools.'}</p></div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
@@ -901,19 +901,19 @@ function StepTerms({ tx, update }) {
               { label: 'Method', val: DEPOSIT_METHODS.find(m=>m.id===depositMethodVal)?.name || '—' },
               { label: 'Closing Date', val: t.closingDate || '—' },
             ].map(({ label, val }) => (
-              <div key={label} className="bg-white rounded-xl p-3 border" style={{ borderColor: '#bbf7d0' }}>
-                <p className="text-xs font-medium" style={{ color: '#16a34a' }}>{label}</p>
-                <p className="font-bold text-sm" style={{ color: '#15803d' }}>{val}</p>
+              <div key={label} className="bg-white rounded-xl p-3 border" style={{ borderColor: 'var(--teal-light)' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--teal)' }}>{label}</p>
+                <p className="font-bold text-sm" style={{ color: 'var(--navy)' }}>{val}</p>
               </div>
             ))}
           </div>
           {!offer.hasPaid && (
-            <button onClick={() => setShowPaywall(true)} className="mt-4 w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, var(--navy), var(--teal))' }}>
+            <button onClick={() => setShowPaywall(true)} className="mt-4 w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ background: 'linear-gradient(170deg, var(--navy) 0%, var(--navy-light) 60%, var(--teal) 100%)' }}>
               <CreditCard className="w-4 h-4" /> Unlock Transaction — from $149
             </button>
           )}
           {offer.hasPaid && (
-            <div className="mt-3 flex items-center gap-2 text-sm font-medium" style={{ color: '#16a34a' }}>
+            <div className="mt-3 flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--teal)' }}>
               <CheckCircle className="w-4 h-4" /> {offer.selectedPlan === 'premium' ? 'Premium' : 'Standard'} Plan Active · All documents unlocked
             </div>
           )}
@@ -951,7 +951,7 @@ function StepTerms({ tx, update }) {
           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#e0f7f4' }}>
             <Shield className="w-5 h-5" style={{ color: 'var(--teal)' }} />
           </div>
-          <h3 className="font-bold" style={{ color: 'var(--navy)' }}>Deposit & Payment Method <span style={{ color: '#ef4444' }}>*</span></h3>
+          <h3 className="font-bold" style={{ color: 'var(--navy)' }}>Deposit & Payment Method <span style={{ color: 'var(--coral)' }}>*</span></h3>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
@@ -990,59 +990,59 @@ function StepTerms({ tx, update }) {
 
         {/* Method-specific detail fields */}
         {depositMethodVal === 'escrow' && (
-          <div className="p-4 rounded-xl space-y-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-            <div className="flex items-center gap-2"><Shield className="w-4 h-4" style={{ color: '#16a34a' }} /><span className="font-semibold text-sm" style={{ color: '#15803d' }}>Escrow.com — Secure Holding</span></div>
-            <p className="text-xs" style={{ color: '#16a34a' }}>Funds held securely by a neutral third party until both parties release.</p>
-            <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#bbf7d0' }}
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#e8f4f3', border: '1px solid #bbf7d0' }}>
+            <div className="flex items-center gap-2"><Shield className="w-4 h-4" style={{ color: 'var(--teal)' }} /><span className="font-semibold text-sm" style={{ color: 'var(--navy)' }}>Escrow.com — Secure Holding</span></div>
+            <p className="text-xs" style={{ color: 'var(--teal)' }}>Funds held securely by a neutral third party until both parties release.</p>
+            <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--teal-light)' }}
               placeholder="Escrow contact email (optional)" type="email" value={escrowEmail} onChange={e => setEscrowEmail(e.target.value)} />
           </div>
         )}
         {depositMethodVal === 'wire' && (
-          <div className="p-4 rounded-xl space-y-3" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-            <div className="flex items-center gap-2"><Building className="w-4 h-4" style={{ color: '#2563eb' }} /><span className="font-semibold text-sm" style={{ color: '#1d4ed8' }}>Wire Transfer Details</span></div>
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#e8f4f3', border: '1px solid #bfdbfe' }}>
+            <div className="flex items-center gap-2"><Building className="w-4 h-4" style={{ color: 'var(--teal)' }} /><span className="font-semibold text-sm" style={{ color: 'var(--navy)' }}>Wire Transfer Details</span></div>
             <div className="grid sm:grid-cols-2 gap-3">
               {[['Recipient Name *', wireName, setWireName, 'John Doe'],['Bank Name', wireBank, setWireBank, 'Chase Bank'],['Routing #', wireRouting, setWireRouting, '021000021'],['Account #', wireAccount, setWireAccount, '••••1234']].map(([lbl, val, setter, ph]) => (
-                <div key={lbl}><label className="block text-xs font-medium mb-1" style={{ color: '#1d4ed8' }}>{lbl}</label>
-                <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#bfdbfe' }} placeholder={ph} value={val} onChange={e => setter(e.target.value)} /></div>
+                <div key={lbl}><label className="block text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>{lbl}</label>
+                <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--teal-light)' }} placeholder={ph} value={val} onChange={e => setter(e.target.value)} /></div>
               ))}
             </div>
-            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ea580c' }} />
-              <span style={{ color: '#9a3412' }}><strong>Wire Fraud Warning:</strong> Always verify wire details by phone directly with the recipient before sending funds.</span>
+            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: 'var(--sand)', border: '1px solid #fed7aa' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--coral)' }} />
+              <span style={{ color: 'var(--navy)' }}><strong>Wire Fraud Warning:</strong> Always verify wire details by phone directly with the recipient before sending funds.</span>
             </div>
           </div>
         )}
         {depositMethodVal === 'zelle' && (
-          <div className="p-4 rounded-xl space-y-3" style={{ background: '#faf5ff', border: '1px solid #e9d5ff' }}>
-            <div className="flex items-center gap-2"><Zap className="w-4 h-4" style={{ color: '#7c3aed' }} /><span className="font-semibold text-sm" style={{ color: '#6d28d9' }}>Zelle Details</span></div>
+          <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--sand)', border: '1px solid #e9d5ff' }}>
+            <div className="flex items-center gap-2"><Zap className="w-4 h-4" style={{ color: 'var(--teal)' }} /><span className="font-semibold text-sm" style={{ color: 'var(--navy)' }}>Zelle Details</span></div>
             <div className="grid sm:grid-cols-2 gap-3">
-              <div><label className="block text-xs font-medium mb-1" style={{ color: '#6d28d9' }}>Recipient Email</label>
-              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#e9d5ff' }} placeholder="seller@email.com" type="email" value={zelleEmail} onChange={e => setZelleEmail(e.target.value)} /></div>
-              <div><label className="block text-xs font-medium mb-1" style={{ color: '#6d28d9' }}>Recipient Phone</label>
-              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#e9d5ff' }} placeholder="(555) 123-4567" value={zellePhone} onChange={e => setZellePhone(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>Recipient Email</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }} placeholder="seller@email.com" type="email" value={zelleEmail} onChange={e => setZelleEmail(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>Recipient Phone</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }} placeholder="(555) 123-4567" value={zellePhone} onChange={e => setZellePhone(e.target.value)} /></div>
             </div>
           </div>
         )}
         {depositMethodVal === 'cash' && (
-          <div className="p-4 rounded-xl space-y-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-            <div className="flex items-center gap-2"><Banknote className="w-4 h-4" style={{ color: '#d97706' }} /><span className="font-semibold text-sm" style={{ color: '#b45309' }}>Cash Meeting Details</span></div>
+          <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--sand)', border: '1px solid #fde68a' }}>
+            <div className="flex items-center gap-2"><Banknote className="w-4 h-4" style={{ color: 'var(--coral)' }} /><span className="font-semibold text-sm" style={{ color: 'var(--navy)' }}>Cash Meeting Details</span></div>
             <div className="grid sm:grid-cols-2 gap-3">
-              <div><label className="block text-xs font-medium mb-1" style={{ color: '#b45309' }}>Meeting Location *</label>
-              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#fde68a' }} placeholder="Marina name or address" value={cashLocation} onChange={e => setCashLocation(e.target.value)} /></div>
-              <div><label className="block text-xs font-medium mb-1" style={{ color: '#b45309' }}>Date</label>
-              <input type="date" className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#fde68a' }} value={cashDate} onChange={e => setCashDate(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>Meeting Location *</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--sand-dark)' }} placeholder="Marina name or address" value={cashLocation} onChange={e => setCashLocation(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: 'var(--navy)' }}>Date</label>
+              <input type="date" className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--sand-dark)' }} value={cashDate} onChange={e => setCashDate(e.target.value)} /></div>
             </div>
-            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
-              <span style={{ color: '#991b1b' }}><strong>Safety:</strong> Meet in a public place. Bring a witness. Count bills before signing.</span>
+            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: '#fff0ef', border: '1px solid #fecaca' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--coral)' }} />
+              <span style={{ color: 'var(--navy)' }}><strong>Safety:</strong> Meet in a public place. Bring a witness. Count bills before signing.</span>
             </div>
           </div>
         )}
         {depositMethodVal === 'none' && (
-          <div className="p-4 rounded-xl flex items-start gap-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
-            <div><p className="font-semibold text-sm" style={{ color: '#991b1b' }}>No Deposit Selected</p>
-            <p className="text-xs mt-1" style={{ color: '#b91c1c' }}>Proceeding without earnest money weakens your offer and provides less security for both parties.</p></div>
+          <div className="p-4 rounded-xl flex items-start gap-3" style={{ background: '#fff0ef', border: '1px solid #fecaca' }}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--coral)' }} />
+            <div><p className="font-semibold text-sm" style={{ color: 'var(--navy)' }}>No Deposit Selected</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--coral)' }}>Proceeding without earnest money weakens your offer and provides less security for both parties.</p></div>
           </div>
         )}
       </div>
@@ -1096,7 +1096,7 @@ function StepTerms({ tx, update }) {
         </div>
         <div className="p-5 bg-white space-y-4">
           {!canGenerateOffer && (
-            <div className="flex items-start gap-2 p-3 rounded-lg text-sm" style={{ background: '#fff8e1', color: '#b45309' }}>
+            <div className="flex items-start gap-2 p-3 rounded-lg text-sm" style={{ background: 'var(--sand)', color: 'var(--navy)' }}>
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>Complete Vessel Details, Parties, Price, Deposit Method, and Closing Date first.</span>
             </div>
@@ -1120,7 +1120,7 @@ function StepTerms({ tx, update }) {
                   <button key={s} onClick={() => { setOff('status', s); if (s === 'accepted' && !offer.hasPaid) setShowPaywall(true); }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all capitalize"
                     style={offer.status === s
-                      ? { background: s === 'accepted' ? '#16a34a' : s === 'rejected' ? '#dc2626' : 'var(--teal)', borderColor: 'transparent', color: 'white' }
+                      ? { background: s === 'accepted' ? 'var(--teal)' : s === 'rejected' ? 'var(--coral)' : 'var(--teal)', borderColor: 'transparent', color: 'white' }
                       : { background: 'white', borderColor: 'var(--gray-200)', color: 'var(--gray-700)' }}>
                     {s}
                   </button>
@@ -1218,7 +1218,7 @@ function StepTerms({ tx, update }) {
                 placeholder="e.g. Wire sent to ABC Escrow account ending 4321" value={dv.notes} onChange={e => setDv('notes', e.target.value)} />
             </div>
             {dv.amount && t.deposit && Number(dv.amount) !== Number(t.deposit) && (
-              <div className="flex items-center gap-2 p-2 rounded-lg text-xs" style={{ background: '#fff8e1', color: '#b45309' }}>
+              <div className="flex items-center gap-2 p-2 rounded-lg text-xs" style={{ background: 'var(--sand)', color: 'var(--navy)' }}>
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 Amount sent ({fmt(dv.amount)}) doesn't match agreed deposit ({fmt(t.deposit)}).
               </div>
@@ -1245,14 +1245,14 @@ function StepTerms({ tx, update }) {
       </div>
 
       {/* ── ESCROW AGENT ─────────────────────────────────────────── */}
-      <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: (esc.funded && esc.released) ? 'var(--teal)' : esc.status !== 'not-started' ? '#fbbf24' : 'var(--gray-200)' }}>
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: (esc.funded && esc.released) ? '#e0f7f4' : esc.status !== 'not-started' ? '#fffbeb' : 'var(--sand)' }}>
+      <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: (esc.funded && esc.released) ? 'var(--teal)' : esc.status !== 'not-started' ? 'var(--coral)' : 'var(--gray-200)' }}>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: (esc.funded && esc.released) ? '#e0f7f4' : esc.status !== 'not-started' ? 'var(--sand)' : 'var(--sand)' }}>
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4" style={{ color: 'var(--navy)' }} />
             <span className="font-bold text-sm" style={{ color: 'var(--navy)' }}>Escrow</span>
             {esc.status !== 'not-started' && (
               <span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize"
-                style={{ background: esc.status === 'released' ? 'var(--teal)' : esc.status === 'funded' ? '#f59e0b' : '#94a3b8', color: 'white' }}>
+                style={{ background: esc.status === 'released' ? 'var(--teal)' : esc.status === 'funded' ? 'var(--coral)' : 'var(--gray-500)', color: 'white' }}>
                 {esc.status === 'released' ? '✓ Released' : esc.status === 'funded' ? 'Funded' : esc.status.replace(/-/g, ' ')}
               </span>
             )}
@@ -1264,9 +1264,9 @@ function StepTerms({ tx, update }) {
         {showEscrow && (
           <div className="p-5 bg-white space-y-5">
             {/* Simple explainer */}
-            <div className="flex items-start gap-3 p-3 rounded-xl text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#2563eb' }} />
-              <p style={{ color: '#1e40af' }}>Escrow is like a trusted piggy bank. The buyer puts the deposit in. Nobody touches it until the deal is done. Then it goes straight to the seller. Everyone is protected.</p>
+            <div className="flex items-start gap-3 p-3 rounded-xl text-sm" style={{ background: '#e8f4f3', border: '1px solid #bfdbfe' }}>
+              <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--teal)' }} />
+              <p style={{ color: 'var(--navy)' }}>Escrow is like a trusted piggy bank. The buyer puts the deposit in. Nobody touches it until the deal is done. Then it goes straight to the seller. Everyone is protected.</p>
             </div>
 
             {/* 4-step status tracker */}
@@ -1338,9 +1338,9 @@ function StepTerms({ tx, update }) {
                     value={esc.wireInstructions} onChange={e => setEsc('wireInstructions', e.target.value)} />
                 </div>
               </div>
-              <div className="flex items-start gap-2 p-3 rounded-lg text-xs mt-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ea580c' }} />
-                <span style={{ color: '#9a3412' }}><strong>Always call to verify</strong> wire instructions by phone before sending any money. Wire fraud is common in boat deals.</span>
+              <div className="flex items-start gap-2 p-3 rounded-lg text-xs mt-3" style={{ background: 'var(--sand)', border: '1px solid #fed7aa' }}>
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--coral)' }} />
+                <span style={{ color: 'var(--navy)' }}><strong>Always call to verify</strong> wire instructions by phone before sending any money. Wire fraud is common in boat deals.</span>
               </div>
             </div>
 
@@ -1645,7 +1645,7 @@ function SignatureModal({ doc, tx, onSign, onClose }) {
             </div>
           )}
 
-          <div className="mt-4 p-3 rounded-lg text-xs" style={{ background: '#fff8e1', color: '#795548' }}>
+          <div className="mt-4 p-3 rounded-lg text-xs" style={{ background: 'var(--sand)', color: '#795548' }}>
             <strong>Legal Notice:</strong> By signing, you agree this constitutes your legally binding electronic signature on this document, pursuant to the E-SIGN Act and UETA.
           </div>
         </div>
