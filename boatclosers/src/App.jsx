@@ -4,7 +4,8 @@ import {
   ChevronLeft, ArrowRight, Menu, X, User, Mail, Phone, MapPin,
   Calendar, Hash, Ship, Users, ClipboardList, Search, Download,
   AlertCircle, Check, Star, Clock, Eye, Edit3, Trash2, Plus,
-  CreditCard, Lock, Globe, Zap, Award, LifeBuoy, Navigation
+  CreditCard, Lock, Globe, Zap, Award, LifeBuoy, Navigation,
+  Send, Bell, AlertTriangle, Building, XCircle, Banknote
 } from 'lucide-react';
 
 // ─── CONSTANTS ───────────────────────────────────────────────
@@ -69,6 +70,9 @@ const emptyTransaction = () => ({
   buyer: { name: '', email: '', phone: '', address: '', city: '', state: '', zip: '' },
   seller: { name: '', email: '', phone: '', address: '', city: '', state: '', zip: '' },
   terms: { price: '', deposit: '', depositHolder: 'escrow', closingDate: '', surveyDeadline: '', financing: 'cash', contingencies: [] },
+  offer: { generated: false, generatedAt: '', status: 'draft', notes: '' },
+  depositVerification: { method: '', reference: '', amount: '', date: '', confirmedBySeller: false, confirmedByBuyer: false, notes: '' },
+  escrow: { agentName: '', company: '', email: '', phone: '', accountNumber: '', bankName: '', routingNumber: '', wireInstructions: '', status: 'not-started', funded: false, conditionsMet: false, released: false },
   diligence: { survey: false, seaTrial: false, titleSearch: false, insurance: false, mechInspection: false, hullInspection: false, depositSent: false, depositReceived: false },
   documents: {},
   signatures: {},
@@ -553,48 +557,805 @@ function StepParties({ tx, update }) {
 }
 
 
-// ─── STEP 3: TERMS ───────────────────────────────────────────
+// ─── STEP 3: TERMS (Combined v2 + v4 best features) ─────────
 function StepTerms({ tx, update }) {
   const t = tx.terms;
-  const set = (k, val) => update(`terms.${k}`, val);
+  const offer = tx.offer || { generated: false, generatedAt: '', status: 'draft', notes: '', hasPaid: false, selectedPlan: 'standard', history: [] };
+  const dv = tx.depositVerification || { method: '', reference: '', amount: '', date: '', confirmedBySeller: false, confirmedByBuyer: false, notes: '' };
+
+  const set    = (k, val) => update(`terms.${k}`, val);
+  const setOff = (k, val) => update(`offer.${k}`, val);
+  const setDv  = (k, val) => update(`depositVerification.${k}`, val);
+  const esc    = tx.escrow || { agentName: '', company: '', email: '', phone: '', accountNumber: '', bankName: '', routingNumber: '', wireInstructions: '', status: 'not-started' };
+  const setEsc = (k, val) => update(`escrow.${k}`, val);
+
+  // ── Local UI state ──────────────────────────────────────────
+  const [showSummary,     setShowSummary]     = useState(false);
+  const [showPaywall,     setShowPaywall]      = useState(false);
+  const [agreedToTerms,   setAgreedToTerms]   = useState(false);
+  const [payProcessing,   setPayProcessing]   = useState(false);
+  const [selectedPlan,    setSelectedPlan]    = useState(offer.selectedPlan || 'standard');
+  const [showDepositPanel,setShowDepositPanel] = useState(false);
+  const [showEscrow,      setShowEscrow]       = useState(false);
+
+  // Deposit method detail fields (local — saved into tx.terms on submit)
+  const [escrowEmail,  setEscrowEmail]  = useState('');
+  const [wireBank,     setWireBank]     = useState('');
+  const [wireRouting,  setWireRouting]  = useState('');
+  const [wireAccount,  setWireAccount]  = useState('');
+  const [wireName,     setWireName]     = useState('');
+  const [zelleEmail,   setZelleEmail]   = useState('');
+  const [zellePhone,   setZellePhone]   = useState('');
+  const [cashLocation, setCashLocation] = useState('');
+  const [cashDate,     setCashDate]     = useState('');
+
+  // ── Constants ───────────────────────────────────────────────
+  const CONTINGENCY_OPTIONS = ['Marine Survey', 'Sea Trial', 'Financing Approval', 'Insurance', 'Title Clear', 'Mechanical Inspection', 'Hull Inspection'];
+  const toggleContingency = (c) => {
+    const curr = t.contingencies || [];
+    set('contingencies', curr.includes(c) ? curr.filter(x => x !== c) : [...curr, c]);
+  };
+
+  const DEPOSIT_METHODS = [
+    { id: 'escrow',  name: 'Escrow.com',       icon: Shield,   desc: 'Secure third-party escrow. Funds held safely until closing.', tag: 'Recommended',     tagStyle: { background: '#d1fae5', color: '#065f46' } },
+    { id: 'wire',    name: 'Wire Transfer',     icon: Building, desc: 'Direct bank wire to deposit holder. Fast & traceable.',       tag: null,               tagStyle: {} },
+    { id: 'zelle',   name: 'Zelle',             icon: Zap,      desc: 'Instant bank-to-bank transfer.',                             tag: null,               tagStyle: {} },
+    { id: 'cash',    name: 'Cash in Person',    icon: Banknote, desc: 'Meet in person at an agreed public location.',                tag: 'In-Person',        tagStyle: { background: '#fef3c7', color: '#92400e' } },
+    { id: 'none',    name: 'No Deposit',        icon: XCircle,  desc: 'Proceed without earnest money deposit.',                     tag: 'Not Recommended',  tagStyle: { background: '#fee2e2', color: '#991b1b' } },
+  ];
+
+  const PLANS = [
+    { id: 'standard', name: 'Standard', price: 149, features: ['Purchase Agreement & Deposit Receipt', 'Due Diligence tracking', 'Bill of Sale & Title Transfer', 'All closing documents', 'Digital signatures for both parties', 'Email notifications'] },
+    { id: 'premium',  name: 'Premium',  price: 249, features: ['Everything in Standard, plus:', 'Escrow.com integration', 'Priority support', 'USCG documentation assistance', 'Delivery & final handoff docs', 'Transaction archive & PDF export', 'Equipment inventory checklist'] },
+  ];
+  const activePlan = PLANS.find(p => p.id === selectedPlan) || PLANS[0];
+
+  // ── Derived ─────────────────────────────────────────────────
+  const vesselLabel = [tx.vessel?.year, tx.vessel?.make, tx.vessel?.model].filter(Boolean).join(' ') || 'This Vessel';
+  const depositMethodVal = t.depositMethod || '';
+  const balanceDue = t.price && t.deposit && depositMethodVal !== 'none'
+    ? Math.max(0, Number(t.price) - Number(t.deposit)) : Number(t.price || 0);
+
+  const canGenerateOffer = !!(t.price && t.closingDate && tx.buyer?.name && tx.seller?.name && tx.vessel?.make && depositMethodVal);
+
+  const isDepositMethodValid = () => {
+    if (!depositMethodVal) return false;
+    if (depositMethodVal === 'none') return true;
+    if (!t.deposit) return false;
+    if (depositMethodVal === 'wire') return !!wireName;
+    if (depositMethodVal === 'zelle') return !!(zelleEmail || zellePhone);
+    if (depositMethodVal === 'cash') return !!cashLocation;
+    return true;
+  };
+
+  // ── Payment handler ─────────────────────────────────────────
+  const handlePaymentComplete = async () => {
+    setPayProcessing(true);
+    await new Promise(r => setTimeout(r, 1500)); // Stripe would go here
+    update('offer', { ...offer, hasPaid: true, selectedPlan, paidAt: new Date().toISOString(), status: offer.status === 'draft' ? 'pending' : offer.status });
+    setPayProcessing(false);
+    setShowPaywall(false);
+    setAgreedToTerms(false);
+  };
+
+  // ── Generate / print offer ──────────────────────────────────
+  const generateOffer = () => {
+    const history = offer.history || [];
+    update('offer', {
+      ...offer,
+      generated: true,
+      generatedAt: new Date().toISOString(),
+      status: offer.status === 'draft' ? 'pending' : offer.status,
+      history: offer.generated ? [...history, { at: offer.generatedAt, price: t.price }] : history,
+    });
+  };
+
+  const depositHolderLabel = { escrow: 'Escrow.com', wire: 'Wire Transfer', zelle: 'Zelle', cash: 'Cash', none: 'No Deposit' }[depositMethodVal] || depositMethodVal;
+  const financingLabel = { cash: 'Cash', financed: 'Bank / Marine Loan', owner: 'Owner Financing' }[t.financing] || t.financing;
+
+  const printOffer = () => {
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <html><head><title>Purchase Offer – BoatClosers</title>
+      <style>
+        body{font-family:Georgia,serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a2b45}
+        h1{font-size:26px;border-bottom:3px solid #0d6e8c;padding-bottom:10px;margin-bottom:6px}
+        h2{font-size:15px;color:#0d6e8c;margin:28px 0 6px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+        .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+        .label{color:#6b7280}.val{font-weight:600}.total{font-size:18px;font-weight:700;color:#0d6e8c}
+        .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+        .chip{padding:3px 10px;background:#e0f2f1;color:#0d6e8c;border-radius:99px;font-size:12px;font-weight:600}
+        .badge{display:inline-block;background:#e0f2f1;color:#0d6e8c;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;margin-left:8px}
+        .sig{display:flex;gap:60px;margin-top:50px}
+        .sig-line{flex:1;border-top:1px solid #999;padding-top:6px;font-size:12px;color:#666}
+        footer{margin-top:40px;font-size:11px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:12px}
+      </style></head><body>
+      <h1>Vessel Purchase Offer <span class="badge">${(offer.status || 'PENDING').toUpperCase()}</span></h1>
+      <p style="font-size:13px;color:#6b7280">Generated ${new Date().toLocaleString()} via BoatClosers &nbsp;|&nbsp; ID: ${tx.id}</p>
+      <h2>Vessel</h2>
+      <div class="row"><span class="label">Year / Make / Model</span><span class="val">${tx.vessel?.year||'—'} ${tx.vessel?.make||'—'} ${tx.vessel?.model||'—'}</span></div>
+      <div class="row"><span class="label">HIN</span><span class="val">${tx.vessel?.hin||'—'}</span></div>
+      <div class="row"><span class="label">Length</span><span class="val">${tx.vessel?.length ? tx.vessel.length+' ft' : '—'}</span></div>
+      <div class="row"><span class="label">Location</span><span class="val">${tx.vessel?.location||'—'}</span></div>
+      <h2>Buyer</h2>
+      <div class="row"><span class="label">Name</span><span class="val">${tx.buyer?.name||'—'}</span></div>
+      <div class="row"><span class="label">Email</span><span class="val">${tx.buyer?.email||'—'}</span></div>
+      <div class="row"><span class="label">Phone</span><span class="val">${tx.buyer?.phone||'—'}</span></div>
+      <h2>Seller</h2>
+      <div class="row"><span class="label">Name</span><span class="val">${tx.seller?.name||'—'}</span></div>
+      <div class="row"><span class="label">Email</span><span class="val">${tx.seller?.email||'—'}</span></div>
+      <div class="row"><span class="label">Phone</span><span class="val">${tx.seller?.phone||'—'}</span></div>
+      <h2>Financial Terms</h2>
+      <div class="row"><span class="label">Offered Purchase Price</span><span class="val">${fmt(t.price)}</span></div>
+      <div class="row"><span class="label">Deposit</span><span class="val">${depositMethodVal === 'none' ? 'No Deposit' : fmt(t.deposit)}</span></div>
+      <div class="row"><span class="label">Deposit Method</span><span class="val">${depositHolderLabel}</span></div>
+      <div class="row"><span class="label">Financing</span><span class="val">${financingLabel}</span></div>
+      <div class="row"><span class="label">Closing Date</span><span class="val">${t.closingDate||'—'}</span></div>
+      <div class="row"><span class="label">Inspection Deadline</span><span class="val">${t.surveyDeadline||'—'}</span></div>
+      <div class="row" style="margin-top:8px"><span class="label" style="font-weight:600">Balance Due at Closing</span><span class="total">${fmt(balanceDue)}</span></div>
+      ${(t.contingencies||[]).length > 0 ? `<h2>Contingencies</h2><div class="chips">${(t.contingencies||[]).map(c=>`<span class="chip">${c}</span>`).join('')}</div>` : ''}
+      ${offer.notes ? `<h2>Notes / Special Terms</h2><p style="font-size:14px">${offer.notes}</p>` : ''}
+      <div class="sig">
+        <div class="sig-line">Buyer Signature &nbsp;&nbsp;&nbsp;&nbsp; Date<br/><br/>${tx.buyer?.name||''}</div>
+        <div class="sig-line">Seller Signature &nbsp;&nbsp;&nbsp;&nbsp; Date<br/><br/>${tx.seller?.name||''}</div>
+      </div>
+      <footer>BoatClosers is a document preparation service, not a licensed broker or attorney. This offer does not constitute legal advice.</footer>
+      </body></html>`);
+    w.document.close(); w.print();
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // PAYWALL MODAL
+  // ══════════════════════════════════════════════════════════
+  const PaywallModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)' }} onClick={() => setShowPaywall(false)}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-8 text-center text-white" style={{ background: 'linear-gradient(135deg, var(--navy) 0%, var(--teal) 100%)' }}>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <Lock className="w-7 h-7 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold">Unlock Your Transaction</h2>
+          <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>One-time fee — access all documents, signing & closing tools</p>
+          {offer.generated && t.price && (
+            <div className="mt-4 rounded-xl p-3 text-sm" style={{ background: 'rgba(255,255,255,0.15)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.8)' }}>{vesselLabel} — </span>
+              <strong className="text-white">{fmt(t.price)}</strong>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Plan cards */}
+          <div className="grid grid-cols-2 gap-3">
+            {PLANS.map(plan => (
+              <button key={plan.id} onClick={() => setSelectedPlan(plan.id)}
+                className="p-4 rounded-xl border-2 text-left transition-all relative"
+                style={selectedPlan === plan.id
+                  ? { borderColor: 'var(--teal)', background: '#e0f7f4' }
+                  : { borderColor: 'var(--gray-200)', background: 'white' }}>
+                {plan.id === 'premium' && (
+                  <span className="absolute -top-2.5 right-2 px-2 py-0.5 rounded-full text-white text-[10px] font-bold" style={{ background: 'linear-gradient(90deg,#f59e0b,#ef4444)' }}>BEST VALUE</span>
+                )}
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-bold text-sm" style={{ color: selectedPlan === plan.id ? 'var(--teal)' : 'var(--navy)' }}>{plan.name}</span>
+                  <span className="text-xl font-bold" style={{ color: selectedPlan === plan.id ? 'var(--teal)' : 'var(--navy)' }}>${plan.price}</span>
+                </div>
+                <div className="space-y-1">
+                  {plan.features.map((f, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs">
+                      <Check className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: 'var(--teal)' }} />
+                      <span style={{ color: 'var(--gray-700)' }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Terms agree */}
+          <div className="rounded-xl border p-4 text-xs space-y-2" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
+            <p className="font-semibold" style={{ color: 'var(--navy)' }}>Platform Agreement</p>
+            <p style={{ color: 'var(--gray-700)' }}><strong>Disclaimer:</strong> BoatClosers is a document preparation service, NOT a licensed broker, attorney, or escrow company. We do not provide legal, financial, or maritime advice.</p>
+            <p style={{ color: 'var(--gray-700)' }}><strong>Liability:</strong> BoatClosers liability is limited to the transaction fee paid. We are not liable for disputes, vessel condition, or transaction outcomes.</p>
+            <p style={{ color: 'var(--gray-700)' }}><strong>Arbitration:</strong> Disputes resolved through binding arbitration.</p>
+            <label className="flex items-center gap-2 mt-3 cursor-pointer">
+              <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="w-4 h-4 rounded" />
+              <span style={{ color: 'var(--gray-700)' }}>I have read and agree to the Terms of Service, Disclaimer, and Arbitration Agreement.</span>
+            </label>
+          </div>
+
+          {/* Pay button */}
+          <button
+            onClick={handlePaymentComplete}
+            disabled={!agreedToTerms || payProcessing}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white transition-all"
+            style={agreedToTerms && !payProcessing
+              ? { background: 'linear-gradient(135deg, var(--navy), var(--teal))' }
+              : { background: 'var(--gray-300)', cursor: 'not-allowed' }}>
+            <CreditCard className="w-5 h-5" />
+            {payProcessing ? 'Processing…' : `Pay $${activePlan.price} — ${activePlan.name} Plan`}
+          </button>
+          {!agreedToTerms && <p className="text-center text-xs" style={{ color: '#b45309' }}>Agree to platform terms above to continue</p>}
+          <p className="text-center text-xs flex items-center justify-center gap-1" style={{ color: 'var(--gray-500)' }}>
+            <Shield className="w-3 h-3" /> Secure payment via Stripe · One-time fee · No hidden charges
+          </p>
+        </div>
+        <div className="border-t px-6 py-4">
+          <button onClick={() => setShowPaywall(false)} className="w-full text-center text-sm" style={{ color: 'var(--gray-500)' }}>Cancel and return</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════
+  // OFFER REVIEW SUMMARY
+  // ══════════════════════════════════════════════════════════
+  if (showSummary) {
+    const methodObj = DEPOSIT_METHODS.find(m => m.id === depositMethodVal);
+    const MIcon = methodObj?.icon || DollarSign;
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <div className="p-6 text-center text-white" style={{ background: 'linear-gradient(135deg, var(--navy), var(--teal))' }}>
+            <Send className="w-10 h-10 mx-auto mb-3 opacity-90" />
+            <h2 className="text-2xl font-bold" style={{ fontFamily: 'Playfair Display, serif' }}>Review Your Offer</h2>
+            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.8)' }}>Confirm everything before generating</p>
+          </div>
+          <div className="bg-white p-6 space-y-5">
+            {/* Vessel */}
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--sand)' }}>
+              <Ship className="w-5 h-5" style={{ color: 'var(--navy)' }} />
+              <div><p className="text-xs" style={{ color: 'var(--gray-500)' }}>Vessel</p><p className="font-bold" style={{ color: 'var(--navy)' }}>{vesselLabel}</p></div>
+            </div>
+            {/* Price row */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-3 rounded-xl border" style={{ borderColor: 'var(--teal)', background: '#e0f7f4' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--teal)' }}>Offer Price</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--navy)' }}>{fmt(t.price)}</p>
+              </div>
+              <div className="text-center p-3 rounded-xl border" style={{ borderColor: 'var(--gray-200)' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--gray-500)' }}>Deposit</p>
+                <p className="text-xl font-bold" style={{ color: 'var(--navy)' }}>{depositMethodVal === 'none' ? 'None' : fmt(t.deposit)}</p>
+              </div>
+              <div className="text-center p-3 rounded-xl border" style={{ borderColor: 'var(--gray-200)' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--gray-500)' }}>Balance Due</p>
+                <p className="text-xl font-bold" style={{ color: 'var(--navy)' }}>{fmt(balanceDue)}</p>
+              </div>
+            </div>
+            {/* Method */}
+            <div className="flex items-center gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--gray-200)' }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#e0f7f4' }}><MIcon className="w-5 h-5" style={{ color: 'var(--teal)' }} /></div>
+              <div><p className="text-xs" style={{ color: 'var(--gray-500)' }}>Deposit Method</p><p className="font-semibold" style={{ color: 'var(--navy)' }}>{methodObj?.name || '—'}</p></div>
+            </div>
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl border" style={{ borderColor: 'var(--gray-200)' }}>
+                <p className="text-xs" style={{ color: 'var(--gray-500)' }}>Closing Date</p>
+                <p className="font-semibold" style={{ color: 'var(--navy)' }}>{t.closingDate || '—'}</p>
+              </div>
+              <div className="p-3 rounded-xl border" style={{ borderColor: 'var(--gray-200)' }}>
+                <p className="text-xs" style={{ color: 'var(--gray-500)' }}>Inspection Deadline</p>
+                <p className="font-semibold" style={{ color: 'var(--navy)' }}>{t.surveyDeadline || '—'}</p>
+              </div>
+            </div>
+            {/* Contingencies */}
+            {(t.contingencies || []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--gray-700)' }}>Contingencies</p>
+                <div className="flex flex-wrap gap-2">
+                  {(t.contingencies || []).map(c => (
+                    <span key={c} className="px-3 py-1 rounded-full text-xs font-medium" style={{ background: '#e0f7f4', color: 'var(--teal)' }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Notes */}
+            {offer.notes && (
+              <div className="p-3 rounded-xl" style={{ background: '#fffbeb', border: '1px solid #fcd34d' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: '#92400e' }}>Notes</p>
+                <p className="text-sm" style={{ color: '#78350f' }}>{offer.notes}</p>
+              </div>
+            )}
+            {/* Disclaimer */}
+            <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'var(--sand)' }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#b45309' }} />
+              <p className="text-xs" style={{ color: 'var(--gray-700)' }}>By generating this offer, you acknowledge BoatClosers is a document preparation service and does not act as a broker, agent, or attorney.</p>
+            </div>
+          </div>
+          <div className="bg-white px-6 pb-6 flex gap-3">
+            <button onClick={() => setShowSummary(false)} className="flex-1 py-2.5 rounded-xl border font-semibold text-sm" style={{ borderColor: 'var(--gray-200)', color: 'var(--gray-700)' }}>← Edit</button>
+            <button onClick={() => { generateOffer(); setShowSummary(false); }} className="flex-1 py-2.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2" style={{ background: 'var(--navy)' }}>
+              <FileText className="w-4 h-4" /> Generate Offer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ══════════════════════════════════════════════════════════
   return (
     <div className="space-y-6">
+      {showPaywall && !offer.hasPaid && <PaywallModal />}
+
       <div>
         <h2 className="text-2xl font-bold mb-1" style={{ color: 'var(--navy)' }}>Terms & Price</h2>
-        <p className="text-sm" style={{ color: 'var(--gray-500)' }}>Set the financial terms of the deal</p>
+        <p className="text-sm" style={{ color: 'var(--gray-500)' }}>Set the financial terms and generate your offer</p>
       </div>
-      <Card title="Purchase Terms">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input label="Purchase Price" icon={DollarSign} type="number" placeholder="50000" value={t.price} onChange={e => set('price', e.target.value)} />
-          <Input label="Deposit Amount" icon={DollarSign} type="number" placeholder="5000" value={t.deposit} onChange={e => set('deposit', e.target.value)} />
-          <Select label="Deposit Held By" value={t.depositHolder} onChange={e => set('depositHolder', e.target.value)}>
-            <option value="escrow">Escrow Agent</option>
-            <option value="seller">Seller</option>
-            <option value="buyer">Buyer holds until closing</option>
-            <option value="third-party">Third-Party Escrow Service</option>
-          </Select>
+
+      {/* ── ACCEPTED OFFER BANNER ────────────────────────────────── */}
+      {offer.generated && offer.status === 'accepted' && (
+        <div className="rounded-2xl p-5 border-2" style={{ background: '#f0fdf4', borderColor: '#86efac' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#bbf7d0' }}><CheckCircle className="w-5 h-5" style={{ color: '#16a34a' }} /></div>
+            <div><h3 className="font-bold" style={{ color: '#15803d' }}>Offer Accepted</h3>
+              <p className="text-sm" style={{ color: '#16a34a' }}>{offer.hasPaid ? 'Platform unlocked — proceed through all steps.' : 'Complete payment to unlock all transaction tools.'}</p></div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Purchase Price', val: fmt(t.price) },
+              { label: 'Deposit', val: depositMethodVal === 'none' ? 'None' : fmt(t.deposit) },
+              { label: 'Method', val: DEPOSIT_METHODS.find(m=>m.id===depositMethodVal)?.name || '—' },
+              { label: 'Closing Date', val: t.closingDate || '—' },
+            ].map(({ label, val }) => (
+              <div key={label} className="bg-white rounded-xl p-3 border" style={{ borderColor: '#bbf7d0' }}>
+                <p className="text-xs font-medium" style={{ color: '#16a34a' }}>{label}</p>
+                <p className="font-bold text-sm" style={{ color: '#15803d' }}>{val}</p>
+              </div>
+            ))}
+          </div>
+          {!offer.hasPaid && (
+            <button onClick={() => setShowPaywall(true)} className="mt-4 w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, var(--navy), var(--teal))' }}>
+              <CreditCard className="w-4 h-4" /> Unlock Transaction — from $149
+            </button>
+          )}
+          {offer.hasPaid && (
+            <div className="mt-3 flex items-center gap-2 text-sm font-medium" style={{ color: '#16a34a' }}>
+              <CheckCircle className="w-4 h-4" /> {offer.selectedPlan === 'premium' ? 'Premium' : 'Standard'} Plan Active · All documents unlocked
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SECTION 1: PURCHASE PRICE ────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#e0f7f4' }}>
+            <DollarSign className="w-5 h-5" style={{ color: 'var(--teal)' }} />
+          </div>
+          <div><h3 className="font-bold" style={{ color: 'var(--navy)' }}>Purchase Price</h3><p className="text-xs" style={{ color: 'var(--gray-500)' }}>for {vesselLabel}</p></div>
+        </div>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-medium" style={{ color: 'var(--gray-500)' }}>$</span>
+          <input type="number" value={t.price} onChange={e => set('price', e.target.value)} placeholder="150,000"
+            className="w-full pl-10 pr-4 py-4 rounded-xl border-2 text-2xl font-bold outline-none transition-all"
+            style={{ borderColor: t.price ? 'var(--teal)' : 'var(--gray-200)', color: 'var(--navy)' }} />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4 mt-4">
           <Select label="Financing" value={t.financing} onChange={e => set('financing', e.target.value)}>
             <option value="cash">Cash</option>
             <option value="financed">Bank / Marine Loan</option>
             <option value="owner">Owner Financing</option>
           </Select>
           <Input label="Closing Date" icon={Calendar} type="date" value={t.closingDate} onChange={e => set('closingDate', e.target.value)} />
-          <Input label="Survey / Inspection Deadline" icon={Calendar} type="date" value={t.surveyDeadline} onChange={e => set('surveyDeadline', e.target.value)} />
+          <Input label="Inspection / Survey Deadline" icon={Calendar} type="date" value={t.surveyDeadline} onChange={e => set('surveyDeadline', e.target.value)} />
         </div>
-      </Card>
-      {t.price && (
-        <Card title="Deal Summary">
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between"><span style={{ color: 'var(--gray-500)' }}>Purchase Price</span><span className="font-bold" style={{ color: 'var(--navy)' }}>{fmt(t.price)}</span></div>
-            <div className="flex justify-between"><span style={{ color: 'var(--gray-500)' }}>Deposit</span><span className="font-medium">{fmt(t.deposit)}</span></div>
-            <div className="flex justify-between border-t border-gray-100 pt-3"><span className="font-semibold" style={{ color: 'var(--navy)' }}>Balance Due at Closing</span><span className="font-bold text-lg" style={{ color: 'var(--teal)' }}>{fmt((t.price || 0) - (t.deposit || 0))}</span></div>
+      </div>
+
+      {/* ── SECTION 2: DEPOSIT METHOD CARDS ─────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#e0f7f4' }}>
+            <Shield className="w-5 h-5" style={{ color: 'var(--teal)' }} />
           </div>
-        </Card>
+          <h3 className="font-bold" style={{ color: 'var(--navy)' }}>Deposit & Payment Method <span style={{ color: '#ef4444' }}>*</span></h3>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+          {DEPOSIT_METHODS.map(method => {
+            const MIcon = method.icon;
+            const sel = depositMethodVal === method.id;
+            return (
+              <button key={method.id} onClick={() => { set('depositMethod', method.id); if (method.id === 'none') set('deposit', ''); }}
+                className="relative p-4 rounded-xl border-2 text-left transition-all hover:shadow-md"
+                style={sel ? { borderColor: 'var(--teal)', background: '#e0f7f4' } : { borderColor: 'var(--gray-200)', background: 'white' }}>
+                {method.tag && (
+                  <span className="absolute -top-2.5 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold" style={method.tagStyle}>{method.tag}</span>
+                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={sel ? { background: 'var(--teal)' } : { background: 'var(--gray-100)' }}>
+                    <MIcon className="w-4 h-4" style={{ color: sel ? 'white' : 'var(--gray-500)' }} />
+                  </div>
+                  <span className="font-semibold text-xs" style={{ color: sel ? 'var(--teal)' : 'var(--navy)' }}>{method.name}</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: sel ? 'var(--teal)' : 'var(--gray-500)' }}>{method.desc}</p>
+                {sel && <CheckCircle className="absolute top-2 right-2 w-4 h-4" style={{ color: 'var(--teal)' }} />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Deposit amount (shown when method chosen and not 'none') */}
+        {depositMethodVal && depositMethodVal !== 'none' && (
+          <div className="mb-4">
+            <Input label="Deposit Amount" icon={DollarSign} type="number" placeholder="5000" value={t.deposit} onChange={e => set('deposit', e.target.value)} />
+            {t.price && t.deposit && (
+              <p className="text-xs mt-1" style={{ color: 'var(--gray-500)' }}>Balance due at closing: <strong style={{ color: 'var(--navy)' }}>{fmt(balanceDue)}</strong></p>
+            )}
+          </div>
+        )}
+
+        {/* Method-specific detail fields */}
+        {depositMethodVal === 'escrow' && (
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+            <div className="flex items-center gap-2"><Shield className="w-4 h-4" style={{ color: '#16a34a' }} /><span className="font-semibold text-sm" style={{ color: '#15803d' }}>Escrow.com — Secure Holding</span></div>
+            <p className="text-xs" style={{ color: '#16a34a' }}>Funds held securely by a neutral third party until both parties release.</p>
+            <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#bbf7d0' }}
+              placeholder="Escrow contact email (optional)" type="email" value={escrowEmail} onChange={e => setEscrowEmail(e.target.value)} />
+          </div>
+        )}
+        {depositMethodVal === 'wire' && (
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+            <div className="flex items-center gap-2"><Building className="w-4 h-4" style={{ color: '#2563eb' }} /><span className="font-semibold text-sm" style={{ color: '#1d4ed8' }}>Wire Transfer Details</span></div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[['Recipient Name *', wireName, setWireName, 'John Doe'],['Bank Name', wireBank, setWireBank, 'Chase Bank'],['Routing #', wireRouting, setWireRouting, '021000021'],['Account #', wireAccount, setWireAccount, '••••1234']].map(([lbl, val, setter, ph]) => (
+                <div key={lbl}><label className="block text-xs font-medium mb-1" style={{ color: '#1d4ed8' }}>{lbl}</label>
+                <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#bfdbfe' }} placeholder={ph} value={val} onChange={e => setter(e.target.value)} /></div>
+              ))}
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ea580c' }} />
+              <span style={{ color: '#9a3412' }}><strong>Wire Fraud Warning:</strong> Always verify wire details by phone directly with the recipient before sending funds.</span>
+            </div>
+          </div>
+        )}
+        {depositMethodVal === 'zelle' && (
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#faf5ff', border: '1px solid #e9d5ff' }}>
+            <div className="flex items-center gap-2"><Zap className="w-4 h-4" style={{ color: '#7c3aed' }} /><span className="font-semibold text-sm" style={{ color: '#6d28d9' }}>Zelle Details</span></div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div><label className="block text-xs font-medium mb-1" style={{ color: '#6d28d9' }}>Recipient Email</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#e9d5ff' }} placeholder="seller@email.com" type="email" value={zelleEmail} onChange={e => setZelleEmail(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: '#6d28d9' }}>Recipient Phone</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#e9d5ff' }} placeholder="(555) 123-4567" value={zellePhone} onChange={e => setZellePhone(e.target.value)} /></div>
+            </div>
+          </div>
+        )}
+        {depositMethodVal === 'cash' && (
+          <div className="p-4 rounded-xl space-y-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+            <div className="flex items-center gap-2"><Banknote className="w-4 h-4" style={{ color: '#d97706' }} /><span className="font-semibold text-sm" style={{ color: '#b45309' }}>Cash Meeting Details</span></div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div><label className="block text-xs font-medium mb-1" style={{ color: '#b45309' }}>Meeting Location *</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#fde68a' }} placeholder="Marina name or address" value={cashLocation} onChange={e => setCashLocation(e.target.value)} /></div>
+              <div><label className="block text-xs font-medium mb-1" style={{ color: '#b45309' }}>Date</label>
+              <input type="date" className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: '#fde68a' }} value={cashDate} onChange={e => setCashDate(e.target.value)} /></div>
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-lg text-xs" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
+              <span style={{ color: '#991b1b' }}><strong>Safety:</strong> Meet in a public place. Bring a witness. Count bills before signing.</span>
+            </div>
+          </div>
+        )}
+        {depositMethodVal === 'none' && (
+          <div className="p-4 rounded-xl flex items-start gap-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
+            <div><p className="font-semibold text-sm" style={{ color: '#991b1b' }}>No Deposit Selected</p>
+            <p className="text-xs mt-1" style={{ color: '#b91c1c' }}>Proceeding without earnest money weakens your offer and provides less security for both parties.</p></div>
+          </div>
+        )}
+      </div>
+
+      {/* ── SECTION 3: CONTINGENCIES ─────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h3 className="font-bold mb-4" style={{ color: 'var(--navy)' }}>Contingencies</h3>
+        <div className="flex flex-wrap gap-2">
+          {CONTINGENCY_OPTIONS.map(c => {
+            const active = (t.contingencies || []).includes(c);
+            return (
+              <button key={c} onClick={() => toggleContingency(c)}
+                className="px-4 py-2 rounded-full text-sm font-medium border transition-all"
+                style={active
+                  ? { background: 'var(--teal)', borderColor: 'var(--teal)', color: 'white' }
+                  : { background: 'white', borderColor: 'var(--gray-200)', color: 'var(--gray-700)' }}>
+                {active && <Check className="w-3 h-3 inline mr-1" />}{c}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── DEAL SUMMARY ─────────────────────────────────────────── */}
+      {t.price && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--navy)' }}>Deal Summary</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span style={{ color: 'var(--gray-500)' }}>Purchase Price</span><span className="font-bold" style={{ color: 'var(--navy)' }}>{fmt(t.price)}</span></div>
+            {depositMethodVal !== 'none' && t.deposit && <div className="flex justify-between"><span style={{ color: 'var(--gray-500)' }}>Deposit ({DEPOSIT_METHODS.find(m=>m.id===depositMethodVal)?.name||''})</span><span className="font-medium">{fmt(t.deposit)}</span></div>}
+            <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: 'var(--gray-100)' }}>
+              <span className="font-semibold" style={{ color: 'var(--navy)' }}>Balance Due at Closing</span>
+              <span className="font-bold text-lg" style={{ color: 'var(--teal)' }}>{fmt(balanceDue)}</span>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* ── OFFER SECTION ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: offer.generated ? 'var(--teal)' : 'var(--gray-200)' }}>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: offer.generated ? '#e0f7f4' : 'var(--sand)' }}>
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4" style={{ color: 'var(--navy)' }} />
+            <span className="font-bold text-sm" style={{ color: 'var(--navy)' }}>Purchase Offer Document</span>
+            {offer.generated && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: 'var(--teal)', color: 'white' }}>
+                {offer.status === 'accepted' ? '✓ Accepted' : offer.status === 'countered' ? '↩ Countered' : offer.status === 'rejected' ? '✕ Rejected' : '⏳ Pending'}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="p-5 bg-white space-y-4">
+          {!canGenerateOffer && (
+            <div className="flex items-start gap-2 p-3 rounded-lg text-sm" style={{ background: '#fff8e1', color: '#b45309' }}>
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Complete Vessel Details, Parties, Price, Deposit Method, and Closing Date first.</span>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Notes / Special Terms (optional)</label>
+            <textarea rows={3} className="w-full text-sm rounded-lg border px-3 py-2 resize-none outline-none"
+              style={{ borderColor: 'var(--gray-200)' }}
+              placeholder="e.g. Offer contingent on clean sea trial. Seller to include all electronics."
+              value={offer.notes} onChange={e => setOff('notes', e.target.value)} />
+          </div>
+
+          {/* Offer status selector */}
+          {offer.generated && (
+            <div>
+              <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--gray-700)' }}>Offer Status</label>
+              <div className="flex gap-2 flex-wrap">
+                {['pending', 'accepted', 'countered', 'rejected'].map(s => (
+                  <button key={s} onClick={() => { setOff('status', s); if (s === 'accepted' && !offer.hasPaid) setShowPaywall(true); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all capitalize"
+                    style={offer.status === s
+                      ? { background: s === 'accepted' ? '#16a34a' : s === 'rejected' ? '#dc2626' : 'var(--teal)', borderColor: 'transparent', color: 'white' }
+                      : { background: 'white', borderColor: 'var(--gray-200)', color: 'var(--gray-700)' }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {offer.status === 'accepted' && !offer.hasPaid && (
+                <button onClick={() => setShowPaywall(true)} className="mt-3 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white" style={{ background: 'var(--navy)' }}>
+                  <Lock className="w-4 h-4" /> Unlock Full Transaction — from $149
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Offer history */}
+          {(offer.history || []).length > 0 && (
+            <div className="rounded-xl p-3" style={{ background: 'var(--sand)' }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--gray-700)' }}>Offer History</p>
+              {(offer.history || []).map((h, i) => (
+                <div key={i} className="flex justify-between text-xs py-1 border-b last:border-0" style={{ borderColor: 'var(--gray-200)', color: 'var(--gray-500)' }}>
+                  <span>{new Date(h.at).toLocaleDateString()}</span><span className="font-medium">{fmt(h.price)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-3 flex-wrap">
+            <button onClick={() => canGenerateOffer && setShowSummary(true)} disabled={!canGenerateOffer}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all"
+              style={canGenerateOffer ? { background: 'var(--navy)', color: 'white' } : { background: 'var(--gray-200)', color: 'var(--gray-500)', cursor: 'not-allowed' }}>
+              <FileText className="w-4 h-4" />
+              {offer.generated ? 'Re-Generate Offer' : 'Review & Generate Offer'}
+            </button>
+            {offer.generated && (
+              <button onClick={printOffer} className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all"
+                style={{ borderColor: 'var(--teal)', color: 'var(--teal)', background: 'white' }}>
+                <Download className="w-4 h-4" /> Print / Save PDF
+              </button>
+            )}
+          </div>
+          {offer.generatedAt && <p className="text-xs" style={{ color: 'var(--gray-500)' }}>Last generated: {new Date(offer.generatedAt).toLocaleString()}</p>}
+        </div>
+      </div>
+
+      {/* ── DEPOSIT VERIFICATION ─────────────────────────────────── */}
+      <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: (dv.confirmedBySeller && dv.confirmedByBuyer) ? 'var(--teal)' : 'var(--gray-200)' }}>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: (dv.confirmedBySeller && dv.confirmedByBuyer) ? '#e0f7f4' : 'var(--sand)' }}>
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4" style={{ color: 'var(--navy)' }} />
+            <span className="font-bold text-sm" style={{ color: 'var(--navy)' }}>Deposit Verification</span>
+            {dv.confirmedBySeller && dv.confirmedByBuyer && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'var(--teal)', color: 'white' }}>✓ Verified</span>
+            )}
+          </div>
+          <button onClick={() => setShowDepositPanel(!showDepositPanel)} className="text-xs font-medium" style={{ color: 'var(--teal)' }}>
+            {showDepositPanel ? 'Hide ▲' : 'Show ▼'}
+          </button>
+        </div>
+        {showDepositPanel && (
+          <div className="p-5 bg-white space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Payment Method</label>
+                <select className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }}
+                  value={dv.method} onChange={e => setDv('method', e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="wire">Wire Transfer</option>
+                  <option value="check">Certified Check</option>
+                  <option value="ach">ACH / Bank Transfer</option>
+                  <option value="cashiers">Cashier's Check</option>
+                  <option value="zelle">Zelle</option>
+                  <option value="cash">Cash</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Reference / Confirmation #</label>
+                <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }}
+                  placeholder="Wire ref # or check #" value={dv.reference} onChange={e => setDv('reference', e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Amount Sent</label>
+                <input type="number" className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }}
+                  placeholder={t.deposit || '5000'} value={dv.amount} onChange={e => setDv('amount', e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Date Sent</label>
+                <input type="date" className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }}
+                  value={dv.date} onChange={e => setDv('date', e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--gray-700)' }}>Notes</label>
+              <input className="w-full text-sm rounded-lg border px-3 py-2 outline-none" style={{ borderColor: 'var(--gray-200)' }}
+                placeholder="e.g. Wire sent to ABC Escrow account ending 4321" value={dv.notes} onChange={e => setDv('notes', e.target.value)} />
+            </div>
+            {dv.amount && t.deposit && Number(dv.amount) !== Number(t.deposit) && (
+              <div className="flex items-center gap-2 p-2 rounded-lg text-xs" style={{ background: '#fff8e1', color: '#b45309' }}>
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Amount sent ({fmt(dv.amount)}) doesn't match agreed deposit ({fmt(t.deposit)}).
+              </div>
+            )}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold" style={{ color: 'var(--gray-700)' }}>Confirmations</p>
+              {[{ key: 'confirmedByBuyer', label: 'Buyer confirms deposit was sent' }, { key: 'confirmedBySeller', label: 'Seller confirms deposit was received' }].map(({ key, label }) => (
+                <button key={key} onClick={() => setDv(key, !dv[key])} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition text-left">
+                  <div className="w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0"
+                    style={dv[key] ? { background: 'var(--teal)', borderColor: 'var(--teal)' } : { borderColor: 'var(--gray-300)' }}>
+                    {dv[key] && <Check className="w-4 h-4 text-white" />}
+                  </div>
+                  <span className="text-sm font-medium" style={{ color: dv[key] ? 'var(--teal)' : 'var(--gray-700)' }}>{label}</span>
+                </button>
+              ))}
+            </div>
+            {dv.confirmedBySeller && dv.confirmedByBuyer && (
+              <div className="flex items-center gap-2 p-3 rounded-lg text-sm font-semibold" style={{ background: '#e0f7f4', color: 'var(--teal)' }}>
+                <CheckCircle className="w-5 h-5" /> Deposit fully verified — {fmt(dv.amount || t.deposit)} via {dv.method || '—'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
+
+      {/* ── ESCROW AGENT ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: (esc.funded && esc.released) ? 'var(--teal)' : esc.status !== 'not-started' ? '#fbbf24' : 'var(--gray-200)' }}>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: (esc.funded && esc.released) ? '#e0f7f4' : esc.status !== 'not-started' ? '#fffbeb' : 'var(--sand)' }}>
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4" style={{ color: 'var(--navy)' }} />
+            <span className="font-bold text-sm" style={{ color: 'var(--navy)' }}>Escrow</span>
+            {esc.status !== 'not-started' && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize"
+                style={{ background: esc.status === 'released' ? 'var(--teal)' : esc.status === 'funded' ? '#f59e0b' : '#94a3b8', color: 'white' }}>
+                {esc.status === 'released' ? '✓ Released' : esc.status === 'funded' ? 'Funded' : esc.status.replace(/-/g, ' ')}
+              </span>
+            )}
+          </div>
+          <button onClick={() => setShowEscrow(!showEscrow)} className="text-xs font-medium" style={{ color: 'var(--teal)' }}>
+            {showEscrow ? 'Hide ▲' : 'Show ▼'}
+          </button>
+        </div>
+        {showEscrow && (
+          <div className="p-5 bg-white space-y-5">
+            {/* Simple explainer */}
+            <div className="flex items-start gap-3 p-3 rounded-xl text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+              <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#2563eb' }} />
+              <p style={{ color: '#1e40af' }}>Escrow is like a trusted piggy bank. The buyer puts the deposit in. Nobody touches it until the deal is done. Then it goes straight to the seller. Everyone is protected.</p>
+            </div>
+
+            {/* 4-step status tracker */}
+            <div>
+              <p className="text-xs font-semibold mb-3" style={{ color: 'var(--gray-700)' }}>Escrow Status</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { key: 'opened',     label: 'Opened',     emoji: '📂', desc: 'Account created' },
+                  { key: 'funded',     label: 'Funded',     emoji: '💰', desc: 'Deposit received' },
+                  { key: 'conditions', label: 'Conditions', emoji: '✅', desc: 'Survey & title clear' },
+                  { key: 'released',   label: 'Released',   emoji: '🎉', desc: 'Paid to seller' },
+                ].map((step) => {
+                  const order = ['not-started', 'opened', 'funded', 'conditions', 'released'];
+                  const done = order.indexOf(step.key) <= order.indexOf(esc.status);
+                  return (
+                    <button key={step.key} onClick={() => setEsc('status', step.key)}
+                      className="flex flex-col items-center p-3 rounded-xl border-2 text-center transition-all"
+                      style={done ? { borderColor: 'var(--teal)', background: '#e0f7f4' } : { borderColor: 'var(--gray-200)', background: 'white' }}>
+                      <span className="text-xl mb-1">{step.emoji}</span>
+                      <span className="text-xs font-bold" style={{ color: done ? 'var(--teal)' : 'var(--gray-500)' }}>{step.label}</span>
+                      <span className="text-[10px] mt-0.5" style={{ color: done ? 'var(--teal)' : 'var(--gray-400)' }}>{step.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Agent info */}
+            <div>
+              <p className="text-xs font-semibold mb-3" style={{ color: 'var(--gray-700)' }}>Escrow Agent Info</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {[
+                  ['Agent Name',  'agentName',  'text',  'Jane Smith'],
+                  ['Company',     'company',    'text',  'Safe Harbor Escrow'],
+                  ['Email',       'email',      'email', 'agent@escrow.com'],
+                  ['Phone',       'phone',      'tel',   '(555) 123-4567'],
+                ].map(([lbl, key, type, ph]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--gray-700)' }}>{lbl}</label>
+                    <input type={type} className="w-full text-sm rounded-lg border px-3 py-2 outline-none"
+                      style={{ borderColor: 'var(--gray-200)' }}
+                      placeholder={ph} value={esc[key]} onChange={e => setEsc(key, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Wire info */}
+            <div>
+              <p className="text-xs font-semibold mb-3" style={{ color: 'var(--gray-700)' }}>Where to Send the Money</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {[
+                  ['Bank Name',      'bankName',      'Chase Bank'],
+                  ['Account Number', 'accountNumber', '••••••4321'],
+                  ['Routing Number', 'routingNumber', '021000021'],
+                ].map(([lbl, key, ph]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1" style={{ color: 'var(--gray-700)' }}>{lbl}</label>
+                    <input type="text" className="w-full text-sm rounded-lg border px-3 py-2 outline-none"
+                      style={{ borderColor: 'var(--gray-200)' }}
+                      placeholder={ph} value={esc[key]} onChange={e => setEsc(key, e.target.value)} />
+                  </div>
+                ))}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--gray-700)' }}>Wire Instructions / Notes</label>
+                  <textarea rows={2} className="w-full text-sm rounded-lg border px-3 py-2 resize-none outline-none"
+                    style={{ borderColor: 'var(--gray-200)' }}
+                    placeholder="Any special wiring notes from the escrow company..."
+                    value={esc.wireInstructions} onChange={e => setEsc('wireInstructions', e.target.value)} />
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-lg text-xs mt-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ea580c' }} />
+                <span style={{ color: '#9a3412' }}><strong>Always call to verify</strong> wire instructions by phone before sending any money. Wire fraud is common in boat deals.</span>
+              </div>
+            </div>
+
+            {esc.status === 'released' && (
+              <div className="flex items-center gap-2 p-3 rounded-lg text-sm font-semibold" style={{ background: '#e0f7f4', color: 'var(--teal)' }}>
+                <CheckCircle className="w-5 h-5" /> Escrow released — funds sent to seller 🎉
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
   );
 }
-
 
 // ─── STEP 4: DUE DILIGENCE ──────────────────────────────────
 function StepDiligence({ tx, update }) {
