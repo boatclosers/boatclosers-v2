@@ -1243,7 +1243,6 @@ function StepTerms({ tx, update }) {
           </div>
         )}
       </div>
-    </div>
 
       {/* ── ESCROW AGENT ─────────────────────────────────────────── */}
       <div className="rounded-2xl border-2 overflow-hidden" style={{ borderColor: (esc.funded && esc.released) ? 'var(--teal)' : esc.status !== 'not-started' ? '#fbbf24' : 'var(--gray-200)' }}>
@@ -1353,7 +1352,7 @@ function StepTerms({ tx, update }) {
           </div>
         )}
       </div>
-
+    </div>
   );
 }
 
